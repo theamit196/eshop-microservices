@@ -1,22 +1,26 @@
-﻿using BuildingBlocks.CQRS;
-using Catalog_API.Models;
-using MediatR;
-using System.Windows.Input;
-
-namespace Catalog_API.Products.CreateProduct
+﻿namespace Catalog_API.Products.CreateProduct
 {
 
     public record CreateProductCommand(string Name, List<string> Category, string Description, string ImageFile, decimal Price)
         : ICommand<CreateProductResult>;
     public record CreateProductResult(Guid Id);
 
-    internal class CreateProductCommandHandler : ICommandHandler<CreateProductCommand, CreateProductResult>
+    public class CreateProductCommandValidator : AbstractValidator<CreateProductCommand>
+    {
+        public CreateProductCommandValidator()
+        {
+            RuleFor(x => x.Name).NotEmpty().WithMessage("Name is required.");
+            RuleFor(x => x.Category).NotEmpty().WithMessage("Category is required.");
+            RuleFor(x => x.ImageFile).NotEmpty().WithMessage("ImageFile is required.");
+            RuleFor(x => x.Price).GreaterThan(0).WithMessage("Price should be greater than zero.");
+        }
+    }
+    internal class CreateProductCommandHandler
+        (IDocumentSession documentSession)
+        : ICommandHandler<CreateProductCommand, CreateProductResult>
     {
         public async Task<CreateProductResult> Handle(CreateProductCommand command, CancellationToken cancellationToken)
         {
-            //Cretate product entity from command object
-            //Save to database
-            //return CreateProductResult result
             var product = new Product
             {
                 Name = command.Name,
@@ -25,8 +29,9 @@ namespace Catalog_API.Products.CreateProduct
                 ImageFile = command.ImageFile,
                 Price = command.Price
             };
-            //TODO:Save to database
-            return new CreateProductResult(Guid.NewGuid());
+            documentSession.Store(product);
+            await documentSession.SaveChangesAsync(cancellationToken);
+            return new CreateProductResult(product.Id);
         }
     }
 }
